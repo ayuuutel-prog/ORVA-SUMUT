@@ -15,6 +15,55 @@ st.set_page_config(
 )
 
 # ==================================
+# SISTEM LOGIN PENGGUNA
+# ==================================
+
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+with st.sidebar:
+    st.title("👤 Akses Pengguna")
+
+    if not st.session_state.admin_logged_in:
+
+        st.info("Mode Pengunjung")
+
+        with st.form("login_admin"):
+            password = st.text_input(
+                "Password Admin",
+                type="password"
+            )
+
+            login_button = st.form_submit_button(
+                "Masuk sebagai Admin",
+                use_container_width=True
+            )
+
+        if login_button:
+            if password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("Password tidak sesuai.")
+
+    else:
+        st.success("Login sebagai Admin")
+
+        if st.button(
+            "Logout",
+            use_container_width=True
+        ):
+            st.session_state.admin_logged_in = False
+            st.rerun()
+
+    st.divider()
+
+    if st.session_state.admin_logged_in:
+        st.caption("Hak akses: Admin")
+    else:
+        st.caption("Hak akses: Pengunjung")
+
+# ==================================
 # HEADER
 # ==================================
 
