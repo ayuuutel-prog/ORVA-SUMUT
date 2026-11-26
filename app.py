@@ -291,6 +291,7 @@ try:
                 "Hapus Data"
             ]
         )
+        
                 if menu_admin == "Tambah Data":
 
             st.subheader("Tambah Data Produksi Padi")
