@@ -2,6 +2,11 @@
 import streamlit as st
 import pandas as pd
 import psycopg2
+import plotly.express as px
+
+# ==================================
+# KONFIGURASI HALAMAN
+# ==================================
 
 st.set_page_config(
     page_title="ORVA SUMUT",
@@ -9,79 +14,218 @@ st.set_page_config(
     layout="wide"
 )
 
+# ==================================
+# HEADER
+# ==================================
+
 st.title("🌾 ORVA SUMUT")
 st.subheader("Oriza Sativa Sumatera Utara")
 
-st.write(
-    "Sistem Integrasi Database Produksi Padi "
-    "Sumatera Utara"
+st.caption(
+    "Sistem Integrasi Database Produksi Padi Sumatera Utara"
 )
 
 st.divider()
 
-st.header("Dashboard Produksi Padi")
+# ==================================
+# KONEKSI DATABASE
+# ==================================
 
 try:
     db_url = st.secrets["DB_PUSAT"]
 
-    conn = psycopg2.connect(db_url)
+    with psycopg2.connect(db_url) as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT
+                nama_kabupaten_kota,
+                tahun,
+                luas_panen,
+                produktivitas,
+                jumlah_produksi,
+                updated_at
+            FROM produksi_padi
+            ORDER BY nama_kabupaten_kota, tahun;
+            """,
+            conn
+        )
 
-    query = """
-        SELECT
-            nama_kabupaten_kota,
-            tahun,
-            luas_panen,
-            produktivitas,
-            jumlah_produksi,
-            updated_at
-        FROM produksi_padi
-        ORDER BY nama_kabupaten_kota, tahun;
-    """
+    # Memastikan tipe data numerik
+    for kolom in [
+        "luas_panen",
+        "produktivitas",
+        "jumlah_produksi"
+    ]:
+        df[kolom] = pd.to_numeric(
+            df[kolom], errors="coerce"
+        )
 
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    if df.empty:
+        st.warning("Belum ada data produksi padi.")
+        st.stop()
+
+    # ==================================
+    # FILTER DATA
+    # ==================================
+
+    st.header("Dashboard Produksi Padi")
+
+    col_filter1, col_filter2 = st.columns(2)
+
+    daftar_kabupaten = ["Semua Kabupaten"] + sorted(
+        df["nama_kabupaten_kota"].dropna().unique().tolist()
+    )
+
+    daftar_tahun = ["Semua Tahun"] + sorted(
+        df["tahun"].dropna().unique().tolist()
+    )
+
+    with col_filter1:
+        kabupaten = st.selectbox(
+            "Pilih Kabupaten",
+            daftar_kabupaten
+        )
+
+    with col_filter2:
+        tahun = st.selectbox(
+            "Pilih Tahun",
+            daftar_tahun
+        )
+
+    # Menerapkan filter
+    data_filter = df.copy()
+
+    if kabupaten != "Semua Kabupaten":
+        data_filter = data_filter[
+            data_filter["nama_kabupaten_kota"] == kabupaten
+        ]
+
+    if tahun != "Semua Tahun":
+        data_filter = data_filter[
+            data_filter["tahun"] == tahun
+        ]
+
+    # ==================================
+    # RINGKASAN DATA
+    # ==================================
+
+    st.subheader("Ringkasan Produksi")
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
         "Kabupaten Terintegrasi",
-        df["nama_kabupaten_kota"].nunique()
+        data_filter["nama_kabupaten_kota"].nunique()
     )
 
     col2.metric(
         "Total Data",
-        len(df)
+        len(data_filter)
     )
+
+    total_produksi = data_filter[
+        "jumlah_produksi"
+    ].sum()
 
     col3.metric(
         "Total Produksi",
-        f"{df['jumlah_produksi'].sum():,.2f} ton"
+        f"{total_produksi:,.2f} ton"
     )
 
     st.divider()
 
+    # ==================================
+    # GRAFIK PRODUKSI PER KABUPATEN
+    # ==================================
+
+    st.subheader("Perbandingan Produksi Antar Kabupaten")
+
+    produksi_kabupaten = (
+        data_filter.groupby("nama_kabupaten_kota", as_index=False)
+        ["jumlah_produksi"].sum()
+    )
+
+    fig1 = px.bar(
+        produksi_kabupaten,
+        x="nama_kabupaten_kota",
+        y="jumlah_produksi",
+        color="nama_kabupaten_kota",
+        text_auto=".2s",
+        labels={
+            "nama_kabupaten_kota": "Kabupaten",
+            "jumlah_produksi": "Produksi (ton)"
+        }
+    )
+
+    fig1.update_layout(
+        showlegend=False,
+        xaxis_title="Kabupaten",
+        yaxis_title="Produksi (ton)"
+    )
+
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # ==================================
+    # GRAFIK PERKEMBANGAN PRODUKSI
+    # ==================================
+
+    st.subheader("Perkembangan Produksi Padi")
+
+    produksi_tahun = (
+        data_filter.groupby("tahun", as_index=False)
+        ["jumlah_produksi"].sum()
+        .sort_values("tahun")
+    )
+
+    fig2 = px.line(
+        produksi_tahun,
+        x="tahun",
+        y="jumlah_produksi",
+        markers=True,
+        text="jumlah_produksi",
+        labels={
+            "tahun": "Tahun",
+            "jumlah_produksi": "Produksi (ton)"
+        }
+    )
+
+    fig2.update_layout(
+        xaxis_title="Tahun",
+        yaxis_title="Produksi (ton)"
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
+
+    st.divider()
+
+    # ==================================
+    # TABEL DATA
+    # ==================================
+
     st.subheader("Data Produksi Padi")
 
     st.dataframe(
-        df,
+        data_filter,
         use_container_width=True,
         hide_index=True
     )
 
-except KeyError:
-    st.warning(
-        "Koneksi database belum dikonfigurasi. "
-        "Silakan atur DB_PUSAT pada Streamlit Secrets."
+    # ==================================
+    # INFORMASI SISTEM
+    # ==================================
+
+    st.divider()
+
+    waktu_update = df["updated_at"].max()
+
+    st.caption(
+        f"Data terakhir diperbarui: {waktu_update}"
     )
 
-except Exception:
-    st.error(
-        "Belum berhasil mengambil data dari database. "
-        "Periksa konfigurasi koneksi."
+    st.caption(
+        "ORVA SUMUT | Oriza Sativa Sumatera Utara"
     )
 
-st.divider()
-
-st.caption(
-    "ORVA SUMUT | Sistem Informasi Produksi Padi Sumatera Utara"
-)
+except Exception as e:
+    st.error("Terjadi kesalahan saat mengambil data.")
+    st.caption(str(e))
