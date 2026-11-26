@@ -1,47 +1,87 @@
 
 import streamlit as st
+import pandas as pd
+import psycopg2
 
-# Konfigurasi halaman
 st.set_page_config(
     page_title="ORVA SUMUT",
     page_icon="🌾",
     layout="wide"
 )
 
-# Identitas sistem
 st.title("🌾 ORVA SUMUT")
 st.subheader("Oriza Sativa Sumatera Utara")
 
-st.markdown(
-    """
-    **Sistem Integrasi Database Produksi Padi Sumatera Utara**
-
-    Platform digital untuk mengintegrasikan, menyajikan,
-    dan mengelola data produksi padi dari berbagai kabupaten
-    di Sumatera Utara secara terpusat.
-    """
+st.write(
+    "Sistem Integrasi Database Produksi Padi "
+    "Sumatera Utara"
 )
 
 st.divider()
 
-# Ringkasan dashboard
-st.header("Dashboard")
+st.header("Dashboard Produksi Padi")
 
-col1, col2, col3 = st.columns(3)
+try:
+    db_url = st.secrets["DB_PUSAT"]
 
-col1.metric("Kabupaten Terintegrasi", "5")
-col2.metric("Total Data", "10")
-col3.metric("Periode Data", "2023–2024")
+    conn = psycopg2.connect(db_url)
+
+    query = """
+        SELECT
+            nama_kabupaten_kota,
+            tahun,
+            luas_panen,
+            produktivitas,
+            jumlah_produksi,
+            updated_at
+        FROM produksi_padi
+        ORDER BY nama_kabupaten_kota, tahun;
+    """
+
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Kabupaten Terintegrasi",
+        df["nama_kabupaten_kota"].nunique()
+    )
+
+    col2.metric(
+        "Total Data",
+        len(df)
+    )
+
+    col3.metric(
+        "Total Produksi",
+        f"{df['jumlah_produksi'].sum():,.2f} ton"
+    )
+
+    st.divider()
+
+    st.subheader("Data Produksi Padi")
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+except KeyError:
+    st.warning(
+        "Koneksi database belum dikonfigurasi. "
+        "Silakan atur DB_PUSAT pada Streamlit Secrets."
+    )
+
+except Exception:
+    st.error(
+        "Belum berhasil mengambil data dari database. "
+        "Periksa konfigurasi koneksi."
+    )
 
 st.divider()
 
-# Menu informasi
-st.header("Informasi Sistem")
-
-st.info(
-    "ORVA SUMUT menghubungkan lima database daerah "
-    "ke dalam satu database pusat melalui proses "
-    "sinkronisasi otomatis."
+st.caption(
+    "ORVA SUMUT | Sistem Informasi Produksi Padi Sumatera Utara"
 )
-
-st.caption("ORVA SUMUT | Sistem Informasi Produksi Padi Sumatera Utara")
