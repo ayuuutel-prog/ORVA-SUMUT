@@ -438,8 +438,77 @@ try:
                 st.error("Gagal mengedit data.")
                 st.caption(str(e))
 
+       
         elif menu_admin == "Hapus Data":
-            st.info("Fitur Hapus Data akan dibuat berikutnya.")
+
+            st.subheader("Hapus Data Produksi Padi")
+
+            kabupaten_hapus = st.selectbox(
+                "Pilih Kabupaten",
+                list(daftar_database.keys()),
+                key="kabupaten_hapus"
+            )
+
+            try:
+                with psycopg2.connect(
+                    st.secrets[daftar_database[kabupaten_hapus]]
+                ) as conn:
+
+                    data_hapus = pd.read_sql_query(
+                        """
+                        SELECT id_produksi, tahun, luas_panen,
+                               produktivitas, jumlah_produksi
+                        FROM produksi_padi
+                        ORDER BY tahun
+                        """,
+                        conn
+                    )
+
+                if data_hapus.empty:
+                    st.warning("Belum ada data untuk kabupaten ini.")
+
+                else:
+                    st.dataframe(
+                        data_hapus,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    id_hapus = st.selectbox(
+                        "Pilih ID Data yang akan dihapus",
+                        data_hapus["id_produksi"].tolist(),
+                        key="id_hapus"
+                    )
+
+                    konfirmasi = st.checkbox(
+                        "Saya yakin ingin menghapus data ini."
+                    )
+
+                    if st.button(
+                        "Hapus Data",
+                        use_container_width=True,
+                        disabled=not konfirmasi
+                    ):
+
+                        with psycopg2.connect(
+                            st.secrets[daftar_database[kabupaten_hapus]]
+                        ) as conn:
+
+                            with conn.cursor() as cursor:
+                                cursor.execute(
+                                    """
+                                    DELETE FROM produksi_padi
+                                    WHERE id_produksi = %s
+                                    """,
+                                    (int(id_hapus),)
+                                )
+
+                        st.success("Data berhasil dihapus!")
+                        st.rerun()
+
+            except Exception as e:
+                st.error("Gagal menghapus data.")
+                st.caption(str(e))
 
     else:
         st.info(
