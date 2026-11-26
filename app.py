@@ -274,6 +274,32 @@ try:
     st.caption(
         "ORVA SUMUT | Oriza Sativa Sumatera Utara"
     )
+        # ==================================
+    # PENGELOLAAN DATA ADMIN
+    # ==================================
+
+    if st.session_state.admin_logged_in:
+
+        st.divider()
+        st.header("Pengelolaan Data Produksi Padi")
+
+        menu_admin = st.selectbox(
+            "Pilih Pengelolaan Data",
+            [
+                "Tambah Data",
+                "Edit Data",
+                "Hapus Data"
+            ]
+        )
+
+        st.info(
+            "Menu ini hanya dapat digunakan oleh pengguna dengan akses Admin."
+        )
+
+    else:
+        st.info(
+            "Login sebagai Admin untuk mengakses fitur pengelolaan data."
+        )
 
 except Exception as e:
     st.error("Terjadi kesalahan saat mengambil data.")
